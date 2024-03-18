@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Container, Box, TextField, Button, Select, MenuItem, InputLabel, FormControl, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography } from '@mui/material';
 
 function App() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -6,16 +7,33 @@ function App() {
   const [searchHistory, setSearchHistory] = useState([]);
 
   useEffect(() => {
-    // Fetch search history from server when component mounts
-    fetch('/PORT/get-users')
-      .then(response => response.json())
-      .then(data => {
+    const fetchhistory = async () => {
+      try {
+        const response = await fetch('http://localhost:2024/get-users');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
         setSearchHistory(data.results);
-      })
-      .catch(error => {
+      } catch (error) {
         console.error('Error fetching search history:', error);
-      });
-  }, []); // Empty dependency array to run this effect only once when the component mounts
+      }
+    };
+    fetchhistory();
+  }, []);
+
+  const fetchSearchHistory = async () => {
+    try {
+      const response = await fetch('http://localhost:2024/get-users');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setSearchHistory(data.results);
+    } catch (error) {
+      console.error('Error fetching search history:', error);
+    }
+  };
 
   const handleInputChange = (event) => {
     setSearchTerm(event.target.value);
@@ -25,72 +43,123 @@ function App() {
     setSelectedOption(event.target.value);
   };
 
-  const handleSubmit = (event) => {
+  const deleteSubmission = async (id) => {
+    try {
+      await fetch(`http://localhost:2024/delete-user/?id=${id}`, { method: 'DELETE' });
+      setSearchHistory(currentHistory => currentHistory.filter(item => item.id !== id));
+    } catch (error) {
+      console.error('Error deleting search history item:', error);
+    }
+  };
+
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    const newSearchHistory = [...searchHistory, `${selectedOption}: ${searchTerm}`];
-    setSearchHistory(newSearchHistory);
+    const now = new Date();
 
-    // POST new search term to the server
-    fetch('/add-user', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        location: selectedOption,
-        rating: searchTerm
-      }),
-    })
-    .then(response => response.json())
-    .then(data => {
-      // Handle response if needed
-      console.log('Response from server:', data);
-    })
-    .catch(error => {
-      console.error('Error posting search term:', error);
-    });
+    const newItem = { 
+      location: selectedOption, 
+      rating: parseInt(searchTerm, 10),       
+      date: now.toISOString() // Add the current date and time
+    };
 
+    try {
+      const response = await fetch('http://localhost:2024/add-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newItem),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const addedItem = await response.json();
+      
+      setSearchHistory(currentHistory => [...currentHistory, addedItem]);
+      console.log(searchHistory)
+    } catch (error) {
+      console.error('Error posting search history item:', error);
+    }
     setSearchTerm('');
     setSelectedOption('');
+    fetchSearchHistory()
   };
 
   return (
-    <div className="App">
-      <header className="App-header">
-        <form onSubmit={handleSubmit}>
-          <select id="followersDropdown" onChange={handleDropdownChange} value={selectedOption}>
-            <option value="">Select an option</option>
-            <option value="MLK">MLK</option>
-            <option value="Moffit">Moffit</option>
-            <option value="Mainstacks">Mainstacks</option>
-          </select>
-          <input 
-            id="searchInput" 
-            placeholder="Enter search term" 
-            value={searchTerm} 
-            onChange={handleInputChange} 
-          />
-          <button type="submit">Submit</button>
-        </form>
-        <div>
-          <h2>Search History</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Search Terms</th>
-              </tr>
-            </thead>
-            <tbody>
-              {searchHistory.map((term, index) => (
-                <tr key={index}>
-                  <td>{term}</td>
-                </tr>
+    <Container maxWidth="sm" sx={{ mt: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold', textAlign: 'center', mb: 2 }}>
+        Please submit how you thought the WiFi was
+      </Typography>
+      <Box
+        component="form"
+        onSubmit={handleSubmit}
+        noValidate
+        autoComplete="off"
+        sx={{
+          '& .MuiTextField-root': { my: 1, width: '100%' },
+          '& .MuiButton-root': { mt: 2 },
+          p: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+          bgcolor: 'background.paper',
+          boxShadow: 3,
+          borderRadius: 1,
+        }}
+      >
+        <FormControl fullWidth>
+          <InputLabel id="location-dropdown-label">Select a location</InputLabel>
+          <Select
+            labelId="location-dropdown-label"
+            id="locationDropdown"
+            value={selectedOption}
+            label="Select a location"
+            onChange={handleDropdownChange}
+          >
+            <MenuItem value=""><em>None</em></MenuItem>
+            <MenuItem value="Moffitt Library">Moffitt Library</MenuItem>
+            <MenuItem value="Haas Courtyard">Haas Courtyard</MenuItem>
+            <MenuItem value="East Asian Library">East Asian Library</MenuItem>
+            <MenuItem value="Sather Gate">Sather Gate</MenuItem>
+            <MenuItem value="Kresge Engineering Library">Kresge Engineering Library</MenuItem>
+          </Select>
+        </FormControl>
+        <TextField
+          id="ratingInput"
+          label="Enter rating"
+          type="number"
+          value={searchTerm}
+          onChange={handleInputChange}
+        />
+        <Button type="submit" variant="contained">Submit</Button>
+      </Box>
+      <Box sx={{ bgcolor: 'background.paper', boxShadow: 3, borderRadius: 1, p: 2 }}>
+        <Typography variant="h6" component="h2">
+          Past Submissions
+        </Typography>
+        <TableContainer component={Paper}>
+          <Table sx={{ minWidth: 650 }} aria-label="search history table">
+            <TableHead>
+              <TableRow>
+                <TableCell>Location</TableCell>
+                <TableCell align="right">Rating</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {[...searchHistory].reverse().map((row, index) => (
+                <TableRow key={index}>
+                <TableCell component="th" scope="row">{row.location}</TableCell>
+                <TableCell align="right">{row.rating}</TableCell>
+                <TableCell align="right"></TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </header>
-    </div>
+            </TableBody>
+
+          </Table>
+        </TableContainer>
+      </Box>
+      
+    </Container>
   );
 }
 
